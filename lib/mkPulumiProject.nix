@@ -1,25 +1,32 @@
 {pkgs, ...}: project: let
   projectOptions = (import ./options.nix).projectOptions;
 
-  filterAttrsRecursive' = pred: set:
-    pkgs.lib.listToAttrs (
-      pkgs.lib.concatMap (
-        name: let
-          v = set.${name};
-        in
-          if pred name v
-          then [
-            (pkgs.lib.nameValuePair name (
-              if pkgs.lib.isAttrs v
-              then filterAttrsRecursive' pred v
-              else if pkgs.lib.isList v
-              then map (e: filterAttrsRecursive' pred e) v
-              else v
-            ))
-          ]
-          else []
-      ) (pkgs.lib.attrNames set)
-    );
+  filterAttrsRecursive' = pred: any:
+    if pkgs.lib.isList any
+    then map (v: filterAttrsRecursive' pred v) any
+    else if pkgs.lib.isAttrs any
+    then let
+      set = any;
+    in
+      pkgs.lib.listToAttrs (
+        pkgs.lib.concatMap (
+          name: let
+            v = set.${name};
+          in
+            if pred name v
+            then [
+              (pkgs.lib.nameValuePair name (
+                if pkgs.lib.isAttrs v
+                then filterAttrsRecursive' pred v
+                else if pkgs.lib.isList v
+                then map (e: filterAttrsRecursive' pred e) v
+                else v
+              ))
+            ]
+            else []
+        ) (pkgs.lib.attrNames set)
+      )
+    else any;
 
   parsed =
     filterAttrsRecursive' (n: v: v != null)
